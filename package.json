@@ -1,0 +1,27 @@
+{
+  "name": "journal-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc --noEmit",
+    "start": "tsx src/server.ts",
+    "hash-password": "tsx src/hash-password.ts",
+    "migrate:legacy": "tsx scripts/migrate-legacy-posts.ts",
+    "migrate:cloudinary": "tsx scripts/migrate-local-media-to-cloudinary.ts",
+    "test": "tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "cloudinary": "^2.11.0",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mongoose": "^8.9.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
