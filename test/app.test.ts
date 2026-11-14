@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomBytes, scryptSync } from "node:crypto";
 import { once } from "node:events";
 import test from "node:test";
 import { createApp } from "../src/app.js";
@@ -35,6 +36,65 @@ test("API reports database readiness and validates public category routes", asyn
   }
 });
 
+test("admin session endpoint signs in, rejects invalid credentials, and logs out", async () => {
+  const keys = [
+    "ADMIN_AUTH_DISABLED",
+    "NODE_ENV",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD_HASH",
+    "SESSION_SECRET",
+  ] as const;
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const email = "admin@example.com";
+  const password = "test-password";
+  const salt = randomBytes(16).toString("hex");
+  process.env.ADMIN_AUTH_DISABLED = "false";
+  process.env.NODE_ENV = "production";
+  process.env.ADMIN_EMAIL = email;
+  process.env.ADMIN_PASSWORD_HASH =
+    `scrypt$${salt}$${scryptSync(password, salt, 64).toString("hex")}`;
+  process.env.SESSION_SECRET = randomBytes(32).toString("hex");
+
+  const server = createApp().listen(0);
+  await once(server, "listening");
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const invalidLogin = await fetch(`${baseUrl}/api/admin/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: "wrong-password" }),
+    });
+    assert.equal(invalidLogin.status, 401);
+    assert.deepEqual(await invalidLogin.json(), { error: "Invalid email or password." });
+
+    const login = await fetch(`${baseUrl}/api/admin/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    assert.equal(login.status, 200);
+    assert.deepEqual(await login.json(), { email });
+    const sessionCookie = login.headers.get("set-cookie");
+    assert.ok(sessionCookie?.includes("HttpOnly"));
+    assert.ok(sessionCookie?.includes("Secure"));
+    assert.ok(sessionCookie?.includes("SameSite=None"));
+
+    const logout = await fetch(`${baseUrl}/api/admin/session`, { method: "DELETE" });
+    assert.equal(logout.status, 204);
+    assert.match(logout.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  } finally {
+    server.close();
+    await once(server, "close");
+    for (const key of keys) {
+      const value = previous[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("admin routes bypass sessions only in explicit development mode", async () => {
   const previousDisabled = process.env.ADMIN_AUTH_DISABLED;
   const previousNodeEnv = process.env.NODE_ENV;
@@ -65,6 +125,13 @@ test("admin routes bypass sessions only in explicit development mode", async () 
       );
       assert.equal(preview.status, 400);
       assert.deepEqual(await preview.json(), { error: "Post id is invalid." });
+
+      const logout = await fetch(
+        `http://127.0.0.1:${address.port}/api/admin/session`,
+        { method: "DELETE" },
+      );
+      assert.equal(logout.status, 200);
+      assert.deepEqual(await logout.json(), { authDisabled: true });
     } finally {
       server.close();
       await once(server, "close");

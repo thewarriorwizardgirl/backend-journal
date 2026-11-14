@@ -186,6 +186,10 @@ export function createApp(): express.Express {
   }));
 
   app.delete("/api/admin/session", (_request, response) => {
+    if (process.env.ADMIN_AUTH_DISABLED === "true") {
+      response.json({ authDisabled: true });
+      return;
+    }
     clearAdminSessionCookie(response);
     response.sendStatus(204);
   });

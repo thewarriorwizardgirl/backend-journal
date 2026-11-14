@@ -24,7 +24,8 @@ to one of these four archive categories.
 - `GET /api/posts/category/:category` — published posts in one category
 - `GET /api/posts/title/:title` — published post by exact title
 - `GET /api/posts/:identifier` — published post by slug or MongoDB id
-- `POST /api/admin/session` and `DELETE /api/admin/session` — admin login/logout
+- `POST /api/admin/session` and `DELETE /api/admin/session` — admin login/logout;
+  login returns the admin email and sets an HttpOnly session cookie
 - `GET|POST /api/admin/posts` — list all posts and create a draft/published post
 - `GET|PUT|DELETE /api/admin/posts/:id` — read, edit, or delete a post
 - `GET /api/admin/posts/:id/preview` — preview a post, including drafts
@@ -47,6 +48,8 @@ frontend, admin, and API over HTTPS.
 To create a password hash, run `npm run hash-password` and set its output as
 `ADMIN_PASSWORD_HASH`. Set `ADMIN_EMAIL` and a random `SESSION_SECRET` of at
 least 32 characters. The password hash format is `scrypt$salt$hex`.
+The admin app uses these endpoints to sign in and out; credentials and session
+signing stay on the backend.
 
 For local UI development only, run the backend with `NODE_ENV=development` and
 set `ADMIN_AUTH_DISABLED=true` to let the admin app call the post-management
